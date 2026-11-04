@@ -1,3 +1,5 @@
+**[Play the web build](https://whwalton04.github.io/Fish-Frog/)** (runs in the browser, built from the `LevelCrab` branch)
+
 # Godot4-Basic3Dstarter
  Godot 4 template, with shader, prototyping, animation, smooth character controller
 
