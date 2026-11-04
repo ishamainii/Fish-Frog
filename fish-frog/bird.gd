@@ -10,6 +10,16 @@ extends RigidBody3D
 @export var maximum_pitch_rate: float = deg_to_rad(45)
 @export var max_velocity: float = 200
 
+@export_group("Walking")
+@export_range(0.1, 20.0, 0.1) var walk_speed: float = 5.0
+@export_range(1.0, 100.0, 1.0) var walk_acceleration: float = 25.0
+@export_range(1.0, 100.0, 1.0) var walk_braking: float = 35.0
+@export var walk_turn_speed: float = deg_to_rad(360.0)
+@export_range(0.001, 0.02, 0.001) var ground_look_sensitivity: float = 0.003
+@export var maximum_ground_look_pitch: float = deg_to_rad(60.0)
+@export var maximum_walkable_slope: float = deg_to_rad(45.0)
+@export_range(1.0, 20.0, 0.5) var takeoff_speed: float = 6.5
+
 @export_group("Cursor Steering")
 @export_range(1.0, 1000.0, 1.0) var cursor_radius: float = 200.0
 @export_range(0.0, 0.9, 0.01) var cursor_dead_zone: float = 0.08
@@ -41,9 +51,18 @@ var aim_pitch: float = 0.0
 var cursor_offset := Vector2.ZERO
 var cursor_bias := Vector2.ZERO
 var cursor_debug_label := Label.new()
+var is_grounded := false
+var ground_normal := Vector3.UP
+var ground_velocity := Vector3.ZERO
+var ground_camera_yaw := 0.0
+var ground_camera_pitch := 0.0
+var takeoff_cooldown := 0.0
+var _flap_requested := false
 
 
 func _ready() -> void:
+	# Floor detection uses actual support contacts, not proximity to a wall.
+	max_contacts_reported = maxi(max_contacts_reported, 8)
 	# Keep the readout while tuning; it can be hidden in the Inspector.
 	var debug_layer := CanvasLayer.new()
 	add_child(debug_layer)
@@ -70,11 +89,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		_apply_cursor_motion(event.screen_relative)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("Flap") and not event.is_echo():
-		apply_central_impulse(Vector3.UP * mass * flap_boost)
+		_flap_requested = true
 		get_viewport().set_input_as_handled()
 
 
 func _apply_cursor_motion(movement: Vector2) -> void:
+	if is_grounded:
+		ground_camera_yaw = wrapf(ground_camera_yaw - movement.x * ground_look_sensitivity, -PI, PI)
+		ground_camera_pitch = clampf(ground_camera_pitch - movement.y * ground_look_sensitivity,
+			-maximum_ground_look_pitch, maximum_ground_look_pitch)
+		return
 	var radius := maxf(cursor_radius, 1.0)
 	cursor_offset = (cursor_offset + movement).limit_length(radius)
 	cursor_bias = _get_cursor_bias()
@@ -136,9 +160,88 @@ func _steer_velocity(motion: Vector3, forward: Vector3, delta: float) -> Vector3
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	var controls_active := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-	_update_steering(state.step, controls_active)
-	state.linear_velocity = _update_flight_velocity(state.linear_velocity, state.step,
-		controls_active, Input.is_action_pressed("boost"))
+	takeoff_cooldown = maxf(0.0, takeoff_cooldown - state.step)
+	_update_ground_contact(state)
+	if _flap_requested:
+		_flap_requested = false
+		if controls_active:
+			state.linear_velocity = _perform_flap(state.linear_velocity)
+	if is_grounded:
+		var movement := Input.get_vector("walk_left", "walk_right", "walk_forward", "walk_backward")
+		state.linear_velocity = _update_walk_velocity(state.linear_velocity, movement, state.step, controls_active)
+	else:
+		_update_steering(state.step, controls_active)
+		state.linear_velocity = _update_flight_velocity(state.linear_velocity, state.step,
+			controls_active, Input.is_action_pressed("boost"))
+
+
+func _update_ground_contact(state: PhysicsDirectBodyState3D) -> void:
+	var supported := false
+	var best_up := cos(maximum_walkable_slope)
+	ground_normal = Vector3.UP
+	ground_velocity = Vector3.ZERO
+	if takeoff_cooldown <= 0.0:
+		for contact in range(state.get_contact_count()):
+			# "Local" identifies this body's side of the contact; normals are world-space.
+			var normal := state.get_contact_local_normal(contact).normalized()
+			var support_velocity := state.get_contact_collider_velocity_at_position(contact)
+			# Do not reattach to a floor while moving away from it after a flap.
+			if normal.y >= best_up and (state.linear_velocity - support_velocity).dot(normal) <= 1.0:
+				best_up = normal.y
+				ground_normal = normal
+				ground_velocity = support_velocity
+				supported = true
+	_set_grounded(supported)
+
+
+func _set_grounded(value: bool) -> void:
+	if is_grounded == value:
+		return
+	is_grounded = value
+	# Both transitions clear steering input so mouse look cannot become a turn.
+	cursor_offset = Vector2.ZERO
+	cursor_bias = Vector2.ZERO
+	aim_yaw = 0.0
+	aim_pitch = 0.0
+	pitch = 0.0
+	roll = 0.0
+	if is_grounded:
+		ground_camera_yaw = camera_pivot.rotation.y
+		ground_camera_pitch = clampf(camera_pivot.rotation.x,
+			-maximum_ground_look_pitch, maximum_ground_look_pitch)
+	else:
+		yaw = ground_camera_yaw
+		# Keep vertical camera look continuous when returning to flight.
+		pitch = clampf(ground_camera_pitch, -maximum_pitch, maximum_pitch)
+		ground_normal = Vector3.UP
+		ground_velocity = Vector3.ZERO
+
+
+func _perform_flap(motion: Vector3) -> Vector3:
+	if is_grounded:
+		_set_grounded(false)
+		takeoff_cooldown = 0.2
+		motion.y = maxf(motion.y, 0.0) + takeoff_speed
+	else:
+		motion.y += flap_boost
+	return motion
+
+
+func _update_walk_velocity(motion: Vector3, movement: Vector2, delta: float, controls_active: bool) -> Vector3:
+	if not controls_active:
+		movement = Vector2.ZERO
+	movement = movement.limit_length(1.0)
+	var camera_basis := Basis(Vector3.UP, ground_camera_yaw)
+	var direction := camera_basis.x * movement.x + camera_basis.z * movement.y
+	var desired := direction.slide(ground_normal).normalized() * walk_speed * movement.length()
+	var relative := motion - ground_velocity
+	var tangent := relative.slide(ground_normal)
+	var acceleration := walk_acceleration if not movement.is_zero_approx() else walk_braking
+	tangent = tangent.move_toward(desired, acceleration * delta)
+	if not direction.is_zero_approx():
+		var target_yaw := atan2(-direction.x, -direction.z)
+		yaw = rotate_toward(yaw, target_yaw, walk_turn_speed * delta)
+	return tangent + ground_normal * relative.dot(ground_normal) + ground_velocity
 
 
 func _update_flight_velocity(motion: Vector3, delta: float, controls_active: bool, accelerating: bool) -> Vector3:
@@ -169,6 +272,12 @@ func _limited_camera_angle(current: float, target: float, delta: float, limit: f
 
 
 func _update_camera(delta: float) -> void:
+	if is_grounded:
+		# Direct mouse look keeps WASD aligned with the visible camera; flight
+		# retains its separate lagged follow behavior below.
+		camera_pivot.rotation = Vector3(ground_camera_pitch, ground_camera_yaw,
+			lerp_angle(camera_pivot.rotation.z, 0.0, _response_weight(delta, 0.1)))
+		return
 	# Use the commanded heading at every speed. Velocity already lags during
 	# turns; following it here would add that lag to the camera's own smoothing.
 	var target_yaw := yaw
@@ -187,9 +296,8 @@ func _update_camera(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	cursor_debug_label.visible = show_cursor_debug
-	cursor_debug_label.text = "Cursor bias: (%.2f, %.2f) | strength: %.2f" % [
-		cursor_bias.x, cursor_bias.y, cursor_bias.length()
-	]
+	cursor_debug_label.text = "Walking | WASD: move | Mouse: look | Space: take off" if is_grounded else \
+		"Flying | Cursor bias: (%.2f, %.2f) | strength: %.2f" % [cursor_bias.x, cursor_bias.y, cursor_bias.length()]
 	# Aim and bank are local offsets, independent of the accumulated heading.
 	visuals.basis = Basis.from_euler(Vector3(pitch, yaw, 0.0)) * Basis.from_euler(Vector3(aim_pitch, aim_yaw, roll))
 	_update_camera(delta)

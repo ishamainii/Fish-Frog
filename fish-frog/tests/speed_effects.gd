@@ -1,5 +1,8 @@
 extends SceneTree
 
+class TestBird extends RigidBody3D:
+	var is_grounded := false
+
 var failures: int = 0
 
 
@@ -22,7 +25,7 @@ func _settle(pivot: Node3D, accelerating: bool = false) -> void:
 
 
 func _run() -> void:
-	var bird := RigidBody3D.new()
+	var bird := TestBird.new()
 	bird.freeze = true
 	var pivot = load("res://camera_pivot.gd").new()
 	var arm := SpringArm3D.new()
@@ -135,6 +138,12 @@ func _run() -> void:
 		pivot.speed_effects_enabled = false
 		_settle(pivot)
 		_check(not lens.visible, "Disabling speed feedback must fade out lens distortion too")
+	pivot.speed_effects_enabled = true
+	bird.is_grounded = true
+	bird.linear_velocity = Vector3(0.0, 0.0, -14.0)
+	_settle(pivot, true)
+	_check(absf(camera.fov - 75.0) < 0.01, "Walking must suppress flight FOV widening even while W is held")
+	_check(not pivot.speed_streaks.visible and not pivot.barrel_distortion.visible, "Walking must suppress flight streaks and distortion")
 	bird.free()
 	print("PASS: speed-based FOV and speed lines" if failures == 0 else "FAIL: %d speed effect checks" % failures)
 	quit(1 if failures > 0 else 0)

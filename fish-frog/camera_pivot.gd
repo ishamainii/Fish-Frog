@@ -49,11 +49,12 @@ func _process(delta: float) -> void:
 
 
 func _update_speed_effects(delta: float, accelerating: bool = false) -> void:
+	var in_flight := not bool(get_parent().get("is_grounded"))
 	# Actual speed includes dives and coasting, rather than only the boost key.
 	var speed := (get_parent() as RigidBody3D).linear_velocity.length()
 	var speed_range := maxf(effect_full_speed - effect_start_speed, 0.001)
 	var target := clampf((speed - effect_start_speed) / speed_range, 0.0, 1.0)
-	if not speed_effects_enabled:
+	if not speed_effects_enabled or not in_flight:
 		target = 0.0
 	var weight := 1.0 - exp(-delta / maxf(speed_effect_response_time, 0.001))
 	speed_intensity = lerpf(speed_intensity, target, weight)
@@ -62,7 +63,7 @@ func _update_speed_effects(delta: float, accelerating: bool = false) -> void:
 	var fov_budget := maxf(maximum_fov_increase, 0.0)
 	var kick := clampf(acceleration_fov_kick, 0.0, fov_budget)
 	var speed_widening := (fov_budget - kick) * pow(target, clampf(fov_speed_exponent, 0.1, 1.0))
-	var throttle_widening := kick if accelerating and speed_effects_enabled else 0.0
+	var throttle_widening := kick if accelerating and speed_effects_enabled and in_flight else 0.0
 	var target_fov := clampf(base_fov + throttle_widening + speed_widening, 1.0, 150.0)
 	var fov_weight := 1.0 - exp(-delta / maxf(fov_response_time, 0.001))
 	camera.fov = lerpf(camera.fov, target_fov, fov_weight)
