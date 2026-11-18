@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://levels/turtle_egg.gd" id="1_egg"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_egg"]
+friction = 0.9
+rough = true
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_egg"]
+radius = 0.065
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_egg"]
+albedo_color = Color(0.96, 0.93, 0.84, 1)
+roughness = 0.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_egg"]
+material = SubResource("StandardMaterial3D_egg")
+radius = 0.065
+height = 0.13
+radial_segments = 16
+rings = 8
+
+[node name="TurtleEgg" type="RigidBody3D"]
+collision_layer = 4
+collision_mask = 7
+mass = 0.6
+physics_material_override = SubResource("PhysicsMaterial_egg")
+continuous_cd = true
+can_sleep = false
+lock_rotation = true
+linear_damp = 0.5
+script = ExtResource("1_egg")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_egg")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_egg")

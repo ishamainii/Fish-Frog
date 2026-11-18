@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://levels/title.gd" id="1_title"]
+[ext_resource type="PackedScene" uid="uid://fkfkcj78lncp" path="res://world/main.tscn" id="2_world"]
+
+[node name="Title" type="Node3D"]
+script = ExtResource("1_title")
+
+[node name="World" parent="." instance=ExtResource("2_world")]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+fov = 55.0
+
+[node name="Ui" type="CanvasLayer" parent="."]
