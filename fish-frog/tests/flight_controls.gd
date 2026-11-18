@@ -14,7 +14,7 @@ func _check(condition: bool, message: String) -> void:
 
 
 func _run() -> void:
-	var bird = load("res://bird.gd").new()
+	var bird = load("res://actors/bird/bird.gd").new()
 	var visuals := Node3D.new()
 	visuals.name = "Visuals"
 	bird.add_child(visuals)

@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://actors/bird/bird_animation.gd" id="1"]
+[ext_resource type="PackedScene" path="res://art/bird/crane_game_rig.glb" id="2"]
+
+[node name="BirdAnimation" type="Node3D"]
+script = ExtResource("1")
+
+[node name="Model" parent="." instance=ExtResource("2")]
+position = Vector3(0, -1.1057375, 0)
+rotation = Vector3(0, 3.14159265, 0)

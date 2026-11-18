@@ -81,6 +81,9 @@ func _box(label: String, position: Vector3, size: Vector3, material: Material,
 
 func _rock(label: String, position: Vector3, scale: Vector3, material: Material,
 		collidable: bool = true) -> Node3D:
+	var mesh := SphereMesh.new()
+	mesh.radial_segments = 7
+	mesh.rings = 3
 	var holder: Node3D
 	if collidable:
 		var body := StaticBody3D.new()
@@ -89,9 +92,14 @@ func _rock(label: String, position: Vector3, scale: Vector3, material: Material,
 		_generated.add_child(body)
 		body.owner = get_tree().edited_scene_root if Engine.is_editor_hint() else null
 		var collision := CollisionShape3D.new()
-		var shape := SphereShape3D.new()
+		# Jolt cannot nonuniformly scale sphere colliders. Bake the faceted
+		# visual's dimensions into a convex hull and leave the node at unit scale.
+		var shape := ConvexPolygonShape3D.new()
+		var points: PackedVector3Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		for index in range(points.size()):
+			points[index] *= scale
+		shape.points = points
 		collision.shape = shape
-		collision.scale = scale
 		body.add_child(collision)
 		collision.owner = get_tree().edited_scene_root if Engine.is_editor_hint() else null
 		holder = body
@@ -103,9 +111,6 @@ func _rock(label: String, position: Vector3, scale: Vector3, material: Material,
 		holder.owner = get_tree().edited_scene_root if Engine.is_editor_hint() else null
 	var visual := MeshInstance3D.new()
 	visual.name = "Faceted rock"
-	var mesh := SphereMesh.new()
-	mesh.radial_segments = 7
-	mesh.rings = 3
 	visual.mesh = mesh
 	visual.scale = scale
 	visual.material_override = material
@@ -119,7 +124,7 @@ func _column(label: String, position: Vector3, height: float, radius: float,
 	var column := _box(label, position, Vector3(radius * 1.2, height, radius * 1.2), material, false)
 	var cap := _rock(label + " cap", position + Vector3(0.0, height * 0.48, 0.0),
 		Vector3(radius * 0.8, radius * 0.5, radius * 0.8), material, false)
-	column.add_child(cap)
+	cap.reparent(column, true)
 	cap.owner = get_tree().edited_scene_root if Engine.is_editor_hint() else null
 
 
@@ -149,7 +154,7 @@ func _build_ocean() -> void:
 		_rock("Nursery reef | %02d" % i, point, Vector3(2.6, 1.0, 2.4), reef)
 	for i in range(6):
 		var x := -29.0 + float(i % 3) * 4.2
-		var z := 9.0 + floor(float(i) / 3.0) * 4.0
+		var z := 9.0 + floorf(float(i) / 3.0) * 4.0
 		_column("Nursery coral placeholder | %02d" % i,
 			Vector3(x, 1.4 + float(i % 2) * 0.25, z), 2.7 + float(i % 3) * 0.5,
 			0.85, coral)

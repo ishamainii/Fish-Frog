@@ -14,7 +14,7 @@ func check(condition: bool, message: String) -> void:
 
 
 func make_bird(at: Vector3) -> RigidBody3D:
-	var bird = load("res://bird.gd").new()
+	var bird = load("res://actors/bird/bird.gd").new()
 	bird.position = at
 	bird.lock_rotation = true
 	bird.can_sleep = false
@@ -62,6 +62,7 @@ func _run() -> void:
 	var diagonal: Vector3 = bird._update_walk_velocity(Vector3.ZERO, Vector2(1, -1), 1.0, true)
 	check(is_equal_approx(diagonal.length(), bird.walk_speed), "Diagonal walking must not exceed walk speed")
 	bird.ground_camera_yaw = -PI / 2
+	bird.camera_pivot.rotation.y = bird.ground_camera_yaw
 	var turned: Vector3 = bird._update_walk_velocity(Vector3.ZERO, Vector2(0, -1), 1.0, true)
 	check(turned.x > 1 and absf(turned.z) < 0.001, "Walking must follow the camera's horizontal heading")
 	var stopped: Vector3 = bird._update_walk_velocity(Vector3(4, -2, 3), Vector2.ZERO, 1.0, true)
@@ -70,6 +71,7 @@ func _run() -> void:
 	check(paused == Vector3.ZERO, "Releasing mouse capture must disable walking input")
 	bird.ground_normal = Vector3(0, 1, 1).normalized()
 	bird.ground_camera_yaw = 0.0
+	bird.camera_pivot.rotation = Vector3.ZERO
 	var slope: Vector3 = bird._update_walk_velocity(Vector3.ZERO, Vector2(0, -1), 1.0, true)
 	check(absf(slope.dot(bird.ground_normal)) < 0.001 and slope.y > 0, "Walking must follow the supporting slope")
 	bird.ground_normal = Vector3.UP
@@ -78,12 +80,45 @@ func _run() -> void:
 	check(platform.is_equal_approx(Vector3(2, 0, 0)), "Idle walking must inherit support-platform velocity")
 	bird.ground_velocity = Vector3.ZERO
 	bird.ground_camera_yaw = 0.0
+	bird.camera_pivot.rotation = Vector3.ZERO
 	bird._apply_cursor_motion(Vector2(80, -40))
 	check(bird.ground_camera_yaw < 0 and bird.ground_camera_pitch > 0, "Ground mouse motion must look around instead of accumulating flight bias")
 	check(bird.cursor_offset == Vector2.ZERO, "Ground camera input must not prime flight steering")
 	bird._update_camera(1.0 / 60.0)
-	check(is_equal_approx(bird.camera_pivot.rotation.y, bird.ground_camera_yaw),
-		"Ground mouse look must immediately match the heading used by walking")
+	check(bird.camera_pivot.rotation.y < 0 and bird.camera_pivot.rotation.y - bird.ground_camera_yaw > .02,
+		"Ground mouse look must ease toward its target instead of snapping")
+	var visible_forward := -Basis(Vector3.UP, bird.camera_pivot.rotation.y).z
+	var viewed_walk: Vector3 = bird._update_walk_velocity(Vector3.ZERO, Vector2(0, -1), 1.0, true)
+	check(viewed_walk.normalized().dot(visible_forward) > .999,
+		"Walking must follow the visible camera while mouse look is smoothing")
+	# Camera translation should lag behind the bird, then settle at rest.
+	var old_camera: Vector3 = bird.camera_pivot.global_position
+	bird.position.x += .4
+	bird._update_camera(1.0 / 60.0)
+	var camera_advance: float = bird.camera_pivot.global_position.x - old_camera.x
+	check(camera_advance > 0 and camera_advance < .4,
+		"Walking camera must follow movement smoothly rather than being position-locked")
+	for tick in range(240):
+		bird._update_camera(1.0 / 60.0)
+	check(bird.camera_pivot.global_position.distance_to(bird.global_position) < .01,
+		"Ground camera must settle back onto the bird when movement stops")
+	bird.position.x += 100
+	bird._update_camera(1.0 / 60.0)
+	check(bird.camera_pivot.global_position.distance_to(bird.global_position) < 1.0,
+		"Dynamic camera lag must stay bounded after a large position change")
+	bird.position.x = 0
+	bird.ground_camera_yaw = wrapf(bird.camera_pivot.rotation.y + deg_to_rad(80), -PI, PI)
+	bird.ground_camera_pitch = deg_to_rad(30)
+	bird._update_camera(1.0 / 60.0)
+	var takeoff_view: Vector3 = bird.camera_pivot.rotation
+	bird._perform_flap(Vector3.ZERO)
+	bird._update_camera(1.0 / 60.0)
+	check(absf(wrapf(bird.camera_pivot.rotation.y - takeoff_view.y, -PI, PI)) < deg_to_rad(1),
+		"Taking off during ground mouse look must preserve the visible heading without a camera snap")
+	check(absf(bird.camera_pivot.rotation.x - takeoff_view.x) < deg_to_rad(1),
+		"Taking off during ground mouse look must preserve the visible camera pitch")
+	bird.takeoff_cooldown = 0.0
+	bird._set_grounded(true)
 	bird._apply_cursor_motion(Vector2(0, -100000))
 	check(bird.ground_camera_pitch <= bird.maximum_ground_look_pitch, "Ground camera pitch must be limited")
 	bird.pitch = 0.5

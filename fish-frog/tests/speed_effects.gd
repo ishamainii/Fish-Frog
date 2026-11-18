@@ -27,7 +27,7 @@ func _settle(pivot: Node3D, accelerating: bool = false) -> void:
 func _run() -> void:
 	var bird := TestBird.new()
 	bird.freeze = true
-	var pivot = load("res://camera_pivot.gd").new()
+	var pivot = load("res://actors/bird/camera_pivot.gd").new()
 	var arm := SpringArm3D.new()
 	arm.name = "SpringArm3D"
 	var camera := Camera3D.new()

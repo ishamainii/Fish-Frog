@@ -1,0 +1,161 @@
+[gd_scene format=3 uid="uid://ga4brol6kes6"]
+
+[ext_resource type="Shader" uid="uid://dtq8vkrpvuqfj" path="res://assets/materials/grid.tres" id="1_78mpy"]
+[ext_resource type="Script" uid="uid://kibsv5k7yh32" path="res://maps/moving_platform.gd" id="3_w4bpu"]
+
+[ext_resource type="PackedScene" path="res://props/grabbable_box.tscn" id="6_pickup"]
+
+[ext_resource type="PackedScene" path="res://actors/bird/bird.tscn" id="bird_player"]
+
+[sub_resource type="Environment" id="Environment_g3bud"]
+background_mode = 1
+background_color = Color(0.411765, 0.756863, 0.909804, 1)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_rwhea"]
+render_priority = 0
+shader = ExtResource("1_78mpy")
+shader_parameter/grid_size = 1
+shader_parameter/Color_1 = Color(0, 0.803922, 0.388235, 1)
+shader_parameter/Color_2 = Color(0, 0.898039, 0.439216, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qmir8"]
+size = Vector3(3, 2, 0.5)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fbvl3"]
+render_priority = 0
+shader = ExtResource("1_78mpy")
+shader_parameter/grid_size = 1
+shader_parameter/Color_1 = Color(0.964706, 0.658824, 0, 1)
+shader_parameter/Color_2 = Color(1, 0.713726, 0.231373, 1)
+
+[sub_resource type="Animation" id="Animation_sy0kk"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector3(3.25, 3.75, 9.05)]
+}
+
+[sub_resource type="Animation" id="Animation_leev5"]
+resource_name = "slide"
+length = 3.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 2
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1.5, 3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(-1.25, 3.75, 9.05), Vector3(2.25, 3.75, 9.05), Vector3(-1.25, 3.75, 9.05)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_vyo8q"]
+_data = {
+&"RESET": SubResource("Animation_sy0kk"),
+&"slide": SubResource("Animation_leev5")
+}
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rxeai"]
+size = Vector3(1.3574365, 0.26281127, 0.23897988)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dwbse"]
+size = Vector3(1.3906324, 1.2884594, 9.665005)
+
+[node name="World" type="Node3D" unique_id=367260359]
+
+[node name="bird" parent="." instance=ExtResource("bird_player")]
+position = Vector3(0, 3, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=691898158]
+environment = SubResource("Environment_g3bud")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=649641616]
+transform = Transform3D(0.866025, 0.25, -0.433013, 0, 0.866026, 0.5, 0.5, -0.433013, 0.75, 0, 6, 0)
+shadow_enabled = true
+
+[node name="RigidBody3D" parent="." instance=ExtResource("6_pickup")]
+position = Vector3(-0.85, 1.38, -1.1)
+
+[node name="CSGBox3D2" type="CSGBox3D" parent="." unique_id=223526915]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.20093346, 0.029271126, 1.6253262)
+use_collision = true
+collision_mask = 7
+size = Vector3(400, 2, 400)
+material = SubResource("ShaderMaterial_rwhea")
+
+[node name="AnimationBody3D3" type="AnimatableBody3D" parent="." unique_id=279490860]
+transform = Transform3D(-7.23586e-16, 1, -4.37114e-08, 5.21541e-08, -4.37114e-08, -1, -1, -1.33227e-15, -5.21541e-08, 3.25, 3.75, 9.05)
+collision_layer = 6
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AnimationBody3D3" unique_id=308779561]
+transform = Transform3D(1, 0, 0, 0, 1, 1.56635e-22, 0, 6.94832e-23, 1, 0, 0, 0)
+shape = SubResource("BoxShape3D_qmir8")
+
+[node name="CSGBox3D8" type="CSGBox3D" parent="AnimationBody3D3" unique_id=1912241800]
+transform = Transform3D(1, 0, 2.98023e-08, 0, 1, 3.72529e-09, 0, 3.72529e-09, 1, 0, 0, 0)
+size = Vector3(3, 2, 0.5)
+material = SubResource("ShaderMaterial_fbvl3")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=788466466]
+root_node = NodePath("../AnimationBody3D3")
+callback_mode_process = 0
+libraries/ = SubResource("AnimationLibrary_vyo8q")
+script = ExtResource("3_w4bpu")
+
+[node name="StaticProps" type="Node3D" parent="." unique_id=1235809117]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 5.5)
+
+[node name="StaticBody3D9" type="StaticBody3D" parent="StaticProps" unique_id=465547754]
+transform = Transform3D(5.7306725e-06, 1.1461344e-05, 131.1025, -131.1025, 5.7306725e-06, 5.7306715e-06, -5.7306715e-06, -131.1025, 1.1461344e-05, -1.7999687, 127.697296, 310.69672)
+collision_layer = 6
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticProps/StaticBody3D9" unique_id=2019937308]
+transform = Transform3D(0.975, 3.1974423e-14, 2.4695696e-14, -2.4868996e-14, 0.975, -4.021672e-12, -3.2147543e-14, 4.021672e-12, 0.975, 1.275343, 1.7970083, 1.0141337)
+shape = SubResource("BoxShape3D_rxeai")
+
+[node name="CSGBox3D8" type="CSGBox3D" parent="StaticProps/StaticBody3D9" unique_id=1747630469]
+transform = Transform3D(1.194, -7.1054275e-16, 6.352746e-25, 4.24194e-15, 0.2, -8.940697e-11, -1.5802452e-23, 7.4505807e-10, 0.024, 1.481, 1.796, 1.019)
+size = Vector3(1.445, 1.295, 10.415)
+material = SubResource("ShaderMaterial_fbvl3")
+
+[node name="StaticBody3D7" type="StaticBody3D" parent="StaticProps" unique_id=346260056]
+transform = Transform3D(-5.004954e-07, -11.45, 5.004954e-07, 0, -5.004954e-07, -11.45, 11.45, -5.004954e-07, 2.1877348e-14, 26.825043, 2.5, 3.5500002)
+collision_layer = 6
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticProps/StaticBody3D7" unique_id=978887914]
+transform = Transform3D(1, -7.1054274e-15, -1.7787692e-20, 7.1054274e-15, 1, -4.131806e-12, 2.727446e-19, 4.131806e-12, 1, 0.8098082, 1.1902544, -4.7137594)
+shape = SubResource("BoxShape3D_dwbse")
+
+[node name="CSGBox3D8" type="CSGBox3D" parent="StaticProps/StaticBody3D7" unique_id=1976093836]
+transform = Transform3D(1, -3.5527137e-15, 2.9802303e-08, 3.5527137e-15, 1, 3.725289e-09, 2.1175824e-22, 3.7252903e-09, 1, 0.8341697, 1.190334, -4.3525014)
+size = Vector3(1.445, 1.295, 10.415)
+material = SubResource("ShaderMaterial_fbvl3")
+
+[node name="StaticBody3D8" type="StaticBody3D" parent="StaticProps" unique_id=1476038920]
+transform = Transform3D(5.7306725e-06, 1.1461344e-05, 131.1025, -131.1025, 5.7306725e-06, 5.7306715e-06, -5.7306715e-06, -131.1025, 1.1461344e-05, 18.674011, 131.04251, 26.449997)
+collision_layer = 6
+collision_mask = 7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticProps/StaticBody3D8" unique_id=1434377232]
+transform = Transform3D(1, 0, 0, 0, 1, 1.56635e-22, 0, 6.94833e-23, 1, 0.83, 1.19, 0.19)
+shape = SubResource("BoxShape3D_rxeai")
+
+[node name="CSGBox3D8" type="CSGBox3D" parent="StaticProps/StaticBody3D8" unique_id=941220792]
+transform = Transform3D(1, -3.5527137e-15, 2.9802301e-08, 3.5527137e-15, 1, 3.7252903e-09, -2.6865725e-16, 3.7252903e-09, 1, 0.83416986, 1.1903343, 0.18980674)
+size = Vector3(0.88, 0.1, 0.18)
+material = SubResource("ShaderMaterial_fbvl3")
+
